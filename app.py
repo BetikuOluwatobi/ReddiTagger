@@ -1,11 +1,19 @@
-from flask import Flask, request, redirect, session
 import os
+import random
 import requests
 import dash
-from dash import dcc, html, Input, Output
-import dash_bootstrap_components as dbc
-import plotly.graph_objs as go
+import spacy
 import pandas as pd
+import numpy as np
+import plotly.graph_objs as go
+import dash_bootstrap_components as dbc
+from dash import dcc, html, Input, Output
+from flair.models import TextClassifier
+from flair.data import Sentence
+from flask import Flask, request, redirect, session, render_template
+from flask_caching import Cache
+from flask_wtf import FlaskForm
+from wtforms import StringField, SubmitField
 
 data = {
     'POSITIVE': [0.1, 0.5, 0.8, 0.6, 0.3, 0.4, 0.7, 0.2, 0.5, 0.4],
@@ -14,7 +22,6 @@ data = {
     'ORG': ['Microsoft', 'Facebook', 'Google', 'Apple', 'Amazon', 'Netflix', 'Tesla', 'Adobe', 'Spotify', 'Twitter'],
     'SCORE': [0.7, 0.3, 0.8, -0.9, 0.6, -0.2, 0.9, -0.7, 0.1, 0.5]
 }
-
 
 df = pd.DataFrame(data)
 
@@ -26,12 +33,126 @@ dash_app = dash.Dash(__name__, server=app,
 
 dash_app.title = "ReddiTagger"
 
-subreddit = [
-    "Investing",
-    "Events",
-    "News",
-    "Sunday",
-]
+cache = Cache(app, config={'CACHE_TYPE': 'simple'})
+
+class SearchForm(FlaskForm):
+    subreddit = StringField('Subreddit')
+    submit = SubmitField('Submit')
+
+nlp = spacy.load('en_core_web_trf')
+# classifier = TextClassifier.load('en-sentiment')
+
+entity = "ORG"
+def extract_entity(text,entity=entity):
+    """
+    Splits text into overlapping segments of maximum length max_len using a stride.
+    """
+    max_len = 356  # BERT's maximum sequence length
+    stride = 128
+    tokens = text.split()  # naive tokenization
+    results = set()
+
+    if len(text.split()) <= 256:
+        doc = nlp(text)
+        for ent in doc.ents:
+            if ent.label_ == entity:
+                results.add(ent.text)
+    else:
+        segments = []
+
+        start = 0
+        while start < len(tokens):
+            end = start + max_len
+            segments.append(" ".join(tokens[start:end]))
+            start += stride
+
+        for segment in segments:
+            doc = nlp(segment)
+            for ent in doc.ents:
+                if ent.label_ == entity:
+                    results.add(ent.text)
+        
+    return list(results)
+
+# def get_sentiments(text):
+#     # Create a sentence object
+#     sentence = Sentence(text)
+    
+#     # Predict sentiment
+#     classifier.predict(sentence)
+    
+#     # Extract sentiment label and score
+#     label = sentence.labels[0].value  # 'POSITIVE' or 'NEGATIVE'
+#     score = sentence.labels[0].score  # Confidence score
+    
+#     return (label, score)
+
+def get_sentiments(text):
+    if len(text.split()) > 264:
+        sentiment_label = random.choice(['POSITIVE', 'NEGATIVE','NEGATIVE','POSITIVE'])
+        confidence_score = random.uniform(0.7, 1.0)
+    else:
+        sentiment_label = random.choice(['POSITIVE','NEGATIVE','NEGATIVE','POSITIVE','POSITIVE', 'NEGATIVE', 'POSITIVE', 'POSITIVE', 'NEGATIVE', 'NEGATIVE'])
+        confidence_score = random.uniform(0.2, 0.7)
+    
+    return sentiment_label, confidence_score
+
+def generate_df(df, entity=entity):
+    distributions = {}
+    for _,row in df.iterrows():
+        direction = row['sentiment'][0]
+        score = row['sentiment'][1]
+        for org in row['organization']:
+            distributions[org] = distributions.get(org, {"POSITIVE":[], "NEGATIVE": [], "FREQS": 0, entity: org})
+            distributions[org][direction].append(score)
+            distributions[org]['FREQS'] += 1
+    for key in distributions.keys():
+        distributions[key]['POSITIVE'] = sum(distributions[key]['POSITIVE'])/distributions[key]["FREQS"]
+        distributions[key]['NEGATIVE'] = sum(distributions[key]['NEGATIVE'])/distributions[key]["FREQS"]
+        distributions[key]['SCORE'] = distributions[key]['POSITIVE'] - distributions[key]['NEGATIVE']
+    data = pd.DataFrame(list(distributions.values()))
+    if 'FREQS' in data.columns:
+        return data.sort_values('FREQS', ascending=False).head(12)
+    else:
+        print("FREQS column not found.")
+        return pd.DataFrame()  # Return an empty dataframe or handle differently
+
+def get_reddit_data(subreddit="Investing", url='', headers=''):
+    post_list = []
+
+    try:
+        res = requests.get(f"{url}/r/{subreddit}/new", headers=headers, params={"limit": 100})
+        res.raise_for_status()
+        
+        while len(post_list) <= 1000:
+            json_data = res.json()
+            children = json_data['data']['children']
+            
+            for post in children:
+                post_data = post['data']
+                dict_to_append = {
+                    'name': post_data['name'], 
+                    'title': post_data['title'], 
+                    'selftext': post_data['selftext'],
+                    'category': post_data.get('category', None),
+                    'upvote_ratio': post_data['upvote_ratio']
+                }
+                post_list.append(dict_to_append)
+
+            # Check if there's more data
+            after = json_data['data'].get('after')
+            if not after:
+                break
+            
+            res = requests.get(f"{url}/r/{subreddit}/new", headers=headers, params={"limit": 100, "after": after})
+            res.raise_for_status()
+
+    except requests.RequestException as e:
+        print(f"Error fetching data from Reddit: {e}")
+        return pd.DataFrame(columns=['name', 'title', 'selftext', 'category', 'upvote_ratio'])
+
+    return pd.DataFrame(post_list)
+
 
 CLIENT_ID = os.getenv('CLIENT_ID')
 CLIENT_SECRET = os.getenv('CLIENT_SECRET')
@@ -39,7 +160,7 @@ REDIRECT_URI = 'http://localhost:5000/callback'
 
 @app.route('/')
 def homepage():
-    auth_url = f"https://www.reddit.com/api/v1/authorize?client_id={CLIENT_ID}&response_type=code&state=random_string&redirect_uri={REDIRECT_URI}&scope=identity"
+    auth_url = f"https://www.reddit.com/api/v1/authorize?client_id={CLIENT_ID}&response_type=code&state=random_string&redirect_uri={REDIRECT_URI}&scope=identity read"
     return f'<a href="{auth_url}">Authenticate with Reddit</a>'
 
 @app.route('/callback')
@@ -56,31 +177,38 @@ def callback():
     }
     response = requests.post(token_url, data=post_data, auth=(CLIENT_ID, CLIENT_SECRET), headers={"User-Agent": "EntityTaggerev0.0.1 by anthony_tobi"})
     token_json = response.json()
+    if 'error' in token_json:
+        print(f"Error getting token: {token_json['error']}")
+
     session['access_token'] = token_json.get('access_token')
 
     return redirect('/authenticate')
 
-@app.route('/authenticate')
-def dashboard():
-    access_token = session.get('access_token')
-    if not access_token:
-        return redirect('/')
+@app.route('/authenticate', methods=['GET', 'POST'])
+def get_data():
+    # Check the request method
+    if request.method == 'GET':
+        access_token = session.get('access_token')
+        if not access_token:
+            return redirect('/')
 
-    headers = {
-        'Authorization': f"bearer {session['access_token']}",
-        "User-Agent": "EntityTaggerev0.0.1 by anthony_tobi"
-    }
+    form = SearchForm()
+    if form.validate_on_submit():
+        subreddit = form.subreddit.data
+        headers = {
+            'Authorization': f"bearer {session['access_token']}",
+            "User-Agent": "EntityTaggerev0.0.1 by anthony_tobi"
+        }
 
-    response = requests.get('https://oauth.reddit.com/r/investing/new', headers=headers, params={"limit": 100})
-    user_data = response.json()
-    # rest of your route logic...
+        url = "https://oauth.reddit.com"
+        data = get_reddit_data(subreddit=subreddit,url=url, headers=headers)
+        data['organization'] = data['selftext'].apply(extract_entity)
+        data['sentiment'] = data['selftext'].apply(get_sentiments)
+        df = generate_df(df=data, entity=entity)
+        cache.set('df', df)  # Store the processed df in cache
 
-
-# @app.route('/fetch_data')
-# def fetch_data():
-#     # You can fetch more data and process as needed
-#     return str(user_data)
-
+        return redirect('/dashboard')
+    return render_template('search_form.html', form=form)
 
 
 #Dropdown
@@ -145,18 +273,15 @@ dash_app.layout = html.Div(style={'backgroundColor': '#e9ecef'}, children=[
 
                 dbc.Label("Select Entity:", className="mt-2"),
                 dbc.Select(
-                id="subreddit",
+                id="entity",
                 options=[
-                    {"label": "primary", "value": "primary"},
-                    {"label": "secondary", "value": "secondary"},
-                    {"label": "success", "value": "success"},
-                    {"label": "danger", "value": "danger"},
-                    {"label": "warning", "value": "warning"},
-                    {"label": "info", "value": "info"},
-                    {"label": "light", "value": "light"},
-                    {"label": "dark", "value": "dark"},
+                    {"label": "ORG", "value": "ORG"},
+                    {"label": "GPE", "value": "GPE"},
+                    {"label": "LOC", "value": "LOC"},
+                    {"label": "EVENT", "value": "EVENT"},
+                    {"label": "WORK_OF_ART", "value": "WORK_OF_ART"},
                 ],
-                value="primary",
+                value="ORG",
                 ),
 
                 # Slider for filtering data based on SCORE
@@ -214,14 +339,18 @@ dash_app.layout = html.Div(style={'backgroundColor': '#e9ecef'}, children=[
     Output('data-table', 'children'),
     Output('bar-plot', 'figure'),
     Output('pie-chart', 'figure')],
-    [Input("subreddit", "value"),
+    [Input("entity", "value"),
     Input('score-slider', 'value')]
 )
 
 
 
-def update_graphs(subreddit,score_range):
-    filtered_df = df[df['SCORE'].between(score_range[0], score_range[1])].iloc[:10]
+def update_graphs(value,score_range):
+    df = cache.get('df')
+    if df is not None:
+        filtered_df = df[df['SCORE'].between(score_range[0], score_range[1])].iloc[:10]
+    else:
+        return "Empty dataframe."
     
     # Creating the bar plot
     bar_plot = go.Figure(data=[go.Bar(
