@@ -13,17 +13,7 @@ from flair.data import Sentence
 from flask import Flask, request, redirect, session, render_template
 from flask_caching import Cache
 from flask_wtf import FlaskForm
-from wtforms import StringField, SubmitField
-
-data = {
-    'POSITIVE': [0.1, 0.5, 0.8, 0.6, 0.3, 0.4, 0.7, 0.2, 0.5, 0.4],
-    'NEGATIVE': [0.9, 0.5, 0.2, 0.4, 0.7, 0.6, 0.3, 0.8, 0.5, 0.6],
-    'FREQS': [10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
-    'ORG': ['Microsoft', 'Facebook', 'Google', 'Apple', 'Amazon', 'Netflix', 'Tesla', 'Adobe', 'Spotify', 'Twitter'],
-    'SCORE': [0.7, 0.3, 0.8, -0.9, 0.6, -0.2, 0.9, -0.7, 0.1, 0.5]
-}
-
-df = pd.DataFrame(data)
+from wtforms import StringField, SubmitField, SelectField
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)  # Random key for session encryption
@@ -37,6 +27,13 @@ cache = Cache(app, config={'CACHE_TYPE': 'simple'})
 
 class SearchForm(FlaskForm):
     subreddit = StringField('Subreddit')
+    entity = SelectField('Entity', choices=[
+        ('ORG', 'ORG'),
+        ('LOC', 'LOC'),
+        ('EVENT', 'EVENT'),
+        ('GPE', 'GPE'),
+        ('WORK_OF_ART', 'WORK_OF_ART')
+    ])
     submit = SubmitField('Submit')
 
 nlp = spacy.load('en_core_web_trf')
@@ -111,11 +108,10 @@ def generate_df(df, entity=entity):
         distributions[key]['NEGATIVE'] = sum(distributions[key]['NEGATIVE'])/distributions[key]["FREQS"]
         distributions[key]['SCORE'] = distributions[key]['POSITIVE'] - distributions[key]['NEGATIVE']
     data = pd.DataFrame(list(distributions.values()))
+    
     if 'FREQS' in data.columns:
         return data.sort_values('FREQS', ascending=False).head(12)
-    else:
-        print("FREQS column not found.")
-        return pd.DataFrame()  # Return an empty dataframe or handle differently
+    return pd.DataFrame()
 
 def get_reddit_data(subreddit="Investing", url='', headers=''):
     post_list = []
@@ -177,8 +173,6 @@ def callback():
     }
     response = requests.post(token_url, data=post_data, auth=(CLIENT_ID, CLIENT_SECRET), headers={"User-Agent": "EntityTaggerev0.0.1 by anthony_tobi"})
     token_json = response.json()
-    if 'error' in token_json:
-        print(f"Error getting token: {token_json['error']}")
 
     session['access_token'] = token_json.get('access_token')
 
@@ -194,7 +188,10 @@ def get_data():
 
     form = SearchForm()
     if form.validate_on_submit():
+        global entity
         subreddit = form.subreddit.data
+        entity = form.entity.data
+        print("Entity: ",entity)
         headers = {
             'Authorization': f"bearer {session['access_token']}",
             "User-Agent": "EntityTaggerev0.0.1 by anthony_tobi"
@@ -202,6 +199,10 @@ def get_data():
 
         url = "https://oauth.reddit.com"
         data = get_reddit_data(subreddit=subreddit,url=url, headers=headers)
+        print(data['selftext'][0])
+        print(len(data))
+        if len(data) <= 1:
+            return redirect('/')
         data['organization'] = data['selftext'].apply(extract_entity)
         data['sentiment'] = data['selftext'].apply(get_sentiments)
         df = generate_df(df=data, entity=entity)
@@ -211,6 +212,14 @@ def get_data():
     return render_template('search_form.html', form=form)
 
 
+def fetch_df_from_cache():
+    df = cache.get('df')
+    if df is None:
+        return pd.DataFrame()  # Return an empty DataFrame if cache is empty
+    return df
+
+
+df = fetch_df_from_cache()
 #Dropdown
 dropdown = dbc.DropdownMenu(
     children=[
@@ -251,6 +260,9 @@ navbar = dbc.Navbar(
     className="mb-2",
 ) 
 
+table_content = dbc.Table.from_dataframe(df.head(), striped=True, bordered=True, hover=True, id="data-table") if df is not None else "No data available."
+
+
 
 dash_app.layout = html.Div(style={'backgroundColor': '#e9ecef'}, children=[
     dbc.Container([
@@ -269,20 +281,6 @@ dash_app.layout = html.Div(style={'backgroundColor': '#e9ecef'}, children=[
                         ),
                     ])
                 ], className="mb-2"),
-
-
-                dbc.Label("Select Entity:", className="mt-2"),
-                dbc.Select(
-                id="entity",
-                options=[
-                    {"label": "ORG", "value": "ORG"},
-                    {"label": "GPE", "value": "GPE"},
-                    {"label": "LOC", "value": "LOC"},
-                    {"label": "EVENT", "value": "EVENT"},
-                    {"label": "WORK_OF_ART", "value": "WORK_OF_ART"},
-                ],
-                value="ORG",
-                ),
 
                 # Slider for filtering data based on SCORE
                 html.Div(
@@ -310,7 +308,7 @@ dash_app.layout = html.Div(style={'backgroundColor': '#e9ecef'}, children=[
                 dbc.Row([
                     dbc.Col([
                         # Top 5 rows in a table
-                        dbc.Table.from_dataframe(df.head(), striped=True, bordered=True, hover=True, id="data-table")
+                        table_content
                     ], className="mb-3")
                 ]),
                 
@@ -346,29 +344,32 @@ dash_app.layout = html.Div(style={'backgroundColor': '#e9ecef'}, children=[
 
 
 def update_graphs(value,score_range):
-    df = cache.get('df')
-    if df is not None:
-        filtered_df = df[df['SCORE'].between(score_range[0], score_range[1])].iloc[:10]
-    else:
-        return "Empty dataframe."
+    df = fetch_df_from_cache()
+    if df.empty:
+        return "No data available.", {}, {}
+        
+    print("Entity: ",entity)
+    dic_map = {'ORG': 'Organization','LOC': "Location", 'GPE': 'Countries/States',
+                'EVENT':'Event','WORK_OF_ART': 'Work of art'}
+    filtered_df = df[df['SCORE'].between(score_range[0], score_range[1])].iloc[:10]
     
     # Creating the bar plot
     bar_plot = go.Figure(data=[go.Bar(
-        x=filtered_df['ORG'],
+        x=filtered_df[entity],
         y=filtered_df['SCORE']
     )])
     bar_plot.update_layout(
-        title_text="Frequency per Organization",
+        title_text=f"Score per {dic_map[entity]}",
         title_x=0.5  # Center the title
     )
 
     # Creating the pie chart
     pie_chart = go.Figure(data=[go.Pie(
-        labels=filtered_df['ORG'],
+        labels=filtered_df[entity],
         values=filtered_df['FREQS']
     )])
     pie_chart.update_layout(
-        title_text="Frequency Distribution",
+        title_text=f"Frequency per {dic_map[entity]}",
         title_x=0.5  # Center the title
     )
     return dbc.Table.from_dataframe(filtered_df.head(), striped=True, bordered=True, hover=True), bar_plot, pie_chart

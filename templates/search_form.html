@@ -3,6 +3,11 @@
 <head>
     <meta charset="utf-8">
     <title>Search Subreddit</title>
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -12,54 +17,36 @@
             align-items: center;
             justify-content: center;
         }
-
-        form {
-            background-color: #fff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.2);
-            width: 300px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 10px;
-            font-weight: bold;
-        }
-
-        input[type="text"] {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            font-size: 16px;
-        }
-
-        input[type="submit"] {
-            background-color: #333;
-            color: #fff;
-            padding: 10px 15px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-
-        input[type="submit"]:hover {
-            background-color: #555;
-        }
     </style>
 </head>
 <body>
-    <form method="post">
-        {{ form.hidden_tag() }}
-        <label>{{ form.subreddit.label }}</label>
-        {{ form.subreddit() }}
-        <div>
-            {{ form.submit() }}
+    <div class="container">
+        <form method="post" class="bg-white p-4 rounded shadow-sm">
+            {{ form.hidden_tag() }}
+            <div class="form-group">
+                <label for="{{ form.subreddit.id }}">{{ form.subreddit.label }}</label>
+                {{ form.subreddit(class="form-control") }}
+            </div>
+
+            <!-- Entity Dropdown using Flask-WTF -->
+            <div class="form-group">
+                {{ form.entity.label(class="form-label") }}
+                {{ form.entity(class="form-control") }}
+            </div>
+
+            <div>
+                {{ form.submit(class="btn btn-dark btn-block") }}
+            </div>
+        </form>
+        <!-- Spinner (You can trigger and control it using JavaScript) -->
+        <div class="spinner-border text-primary" role="status" id="loadingSpinner" style="display: none;">
+            <span class="sr-only">Loading...</span>
         </div>
-    </form>
+        <!-- Progress Bar (You can set its value using JavaScript) -->
+        <div class="progress mt-3 w-100" style="display: none;" id="progressBarContainer">
+            <div class="progress-bar" role="progressbar" style="width: 0%;" id="progressBar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+        </div>
+    </div>
 </body>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
