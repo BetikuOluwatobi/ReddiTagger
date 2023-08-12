@@ -13,7 +13,7 @@ from flair.data import Sentence
 from flask import Flask, request, redirect, session, render_template
 from flask_caching import Cache
 from flask_wtf import FlaskForm
-from wtforms import StringField, SubmitField, SelectField
+from wtforms import SubmitField, SelectField
 
 
 app = Flask(__name__)
@@ -47,7 +47,7 @@ class SearchForm(FlaskForm):
     submit = SubmitField('Submit')
 
 nlp = spacy.load('en_core_web_trf')
-# classifier = TextClassifier.load('en-sentiment')
+classifier = TextClassifier.load('en-sentiment')
 
 entity = "ORG"
 def extract_entity(text,entity="ORG"):
@@ -81,28 +81,34 @@ def extract_entity(text,entity="ORG"):
         
     return list(results)
 
-# def get_sentiments(text):
-#     # Create a sentence object
-#     sentence = Sentence(text)
-    
-#     # Predict sentiment
-#     classifier.predict(sentence)
-    
-#     # Extract sentiment label and score
-#     label = sentence.labels[0].value  # 'POSITIVE' or 'NEGATIVE'
-#     score = sentence.labels[0].score  # Confidence score
-    
-#     return (label, score)
-
 def get_sentiments(text):
-    if len(text.split()) > 264:
-        sentiment_label = random.choice(['POSITIVE', 'NEGATIVE','NEGATIVE','POSITIVE'])
-        confidence_score = random.uniform(0.7, 1.0)
-    else:
-        sentiment_label = random.choice(['POSITIVE','NEGATIVE','NEGATIVE','POSITIVE','POSITIVE', 'NEGATIVE', 'POSITIVE', 'POSITIVE', 'NEGATIVE', 'NEGATIVE'])
-        confidence_score = random.uniform(0.2, 0.7)
+    # Create a sentence object
+    sentence = Sentence(text)
     
-    return sentiment_label, confidence_score
+    # Predict sentiment
+    classifier.predict(sentence)
+
+    # Check if labels exist in the sentence
+    if sentence.labels:
+        # Extract sentiment label and score
+        label = sentence.labels[0].value  # 'POSITIVE' or 'NEGATIVE'
+        score = sentence.labels[0].score  # Confidence score
+    else:
+        # Handle the case when there are no labels. You can set default values or handle it accordingly.
+        label = "POSITIVE"
+        score = 0
+    
+    return (label, score)
+
+# def get_sentiments(text):
+#     if len(text.split()) > 264:
+#         sentiment_label = random.choice(['POSITIVE', 'NEGATIVE','NEGATIVE','POSITIVE'])
+#         confidence_score = random.uniform(0.7, 1.0)
+#     else:
+#         sentiment_label = random.choice(['POSITIVE','NEGATIVE','NEGATIVE','POSITIVE','POSITIVE', 'NEGATIVE', 'POSITIVE', 'POSITIVE', 'NEGATIVE', 'NEGATIVE'])
+#         confidence_score = random.uniform(0.2, 0.7)
+    
+#     return sentiment_label, confidence_score
 
 def generate_df(df, entity="ORG"):
     distributions = {}
