@@ -1,10 +1,10 @@
 import os
 import random
 import requests
-import dash
-import spacy
 import pandas as pd
 import numpy as np
+import dash
+import spacy
 import plotly.graph_objs as go
 import dash_bootstrap_components as dbc
 from dash import dcc, html, Input, Output
@@ -15,6 +15,7 @@ from flask_caching import Cache
 from flask_wtf import FlaskForm
 from wtforms import StringField, SubmitField, SelectField
 
+
 app = Flask(__name__)
 app.secret_key = os.urandom(24)  # Random key for session encryption
 dash_app = dash.Dash(__name__, server=app, 
@@ -24,23 +25,24 @@ dash_app = dash.Dash(__name__, server=app,
 dash_app.title = "ReddiTagger"
 
 cache = Cache(app, config={'CACHE_TYPE': 'simple', 'CACHE_DEFAULT_TIMEOUT': 300})
+app.config['PERMANENT_SESSION_LIFETIME'] = 3600
 
 class SearchForm(FlaskForm):
     subreddit = SelectField('Subreddit', choices=[
-        ('Investing', 'investing'),
-        ('Stocks','stocks')
-        ('Europe', 'europe'),
-        ('Africa','africa'),
-        ('Asia','asia')
-        ('History', 'history'),
-        ('Worldnews','worldnews'),
-        ('Travel','travel'),
-        ('Geography','geography')
+        ('investing', 'Investing'),
+        ('stocks','Stocks'),
+        ('europe', 'Europe'),
+        ('africa','Africa'),
+        ('asia','Asia'),
+        ('history', 'History'),
+        ('worldnews','Worldnews'),
+        ('travel','Travel'),
+        ('geography','Geography')
     ])
     entity = SelectField('Entity', choices=[
-        ('Organizations', 'ORG'),
-        ('Location', 'LOC'),
-        ('Countries/State', 'GPE'),
+        ('ORG','Organizations'),
+        ('LOC','Location'),
+        ('GPE','Countries/State'),
     ])
     submit = SubmitField('Submit')
 
@@ -183,6 +185,7 @@ def callback():
     token_json = response.json()
 
     session['access_token'] = token_json.get('access_token')
+    session.permanent = True
 
     return redirect('/authenticate')
 
@@ -209,7 +212,6 @@ def get_data():
         data['organization'] = data['selftext'].apply(extract_entity, entity=entity)
         data['sentiment'] = data['selftext'].apply(get_sentiments)
         df = generate_df(df=data, entity=entity)
-        print(df.info())
         cache.set('df', df, timeout=3000)  # Store the processed df in cache
 
         return redirect('/dashboard')
@@ -243,8 +245,8 @@ navbar = dbc.Navbar(
             # Use row and col to control vertical alignment of logo / brand
             dbc.Row(
                 [
-                    dbc.Col(html.Img(src="https://upload.wikimedia.org/wikipedia/commons/8/8a/Plotly_logo_for_digital_final_%286%29.png", height="40px")),  # Reduced height
-                    dbc.Col(dbc.NavbarBrand("DASH", className="ms-2")),
+                    dbc.Col(html.Img(src="https://upload.wikimedia.org/wikipedia/commons/8/8a/Plotly_logo_for_digital_final_%286%29.png", height="80px")),  # Reduced height
+                    dbc.Col(dbc.NavbarBrand("Dash", className="ms-2")),
                 ],
                 align="center",
                 className="g-0",
@@ -266,6 +268,7 @@ navbar = dbc.Navbar(
 
 table_content = dbc.Table.from_dataframe(df.head(), striped=True, bordered=True, hover=True, id="data-table") if df is not None else "No data available."
 
+dic_map = {'ORG': 'Organization','LOC': "Location", 'GPE': 'Countries/States'}
 
 
 dash_app.layout = html.Div(style={'backgroundColor': '#e9ecef'}, children=[
@@ -280,7 +283,9 @@ dash_app.layout = html.Div(style={'backgroundColor': '#e9ecef'}, children=[
                     dbc.CardBody([
                         html.H5("ReddiTagger", className="card-title", style={'fontWeight': 'bold'}),
                         html.Div(
-                            "Explore clinic patient volume by time of day, waiting time, and care score. Click on the heatmap to visualize patient experience at different time points.",
+                            f"""
+                                Drag the filter score slider below to visualize different {dic_map[entity]} sentiment score between specified intervals.
+                            """,
                             className="card-text mt-3"
                         ),
                     ])
@@ -361,7 +366,6 @@ def update_graphs(score_range):
         return "No data available.", {}, {}, {}
    
     cache.set('df', df, timeout=1500)
-    dic_map = {'ORG': 'Organization','LOC': "Location", 'GPE': 'Countries/States'}
     filtered_df = df[df['SCORE'].between(score_range[0], score_range[1])].iloc[:10]
     
     categories = ['POSITIVE', 'NEGATIVE', 'SCORE']

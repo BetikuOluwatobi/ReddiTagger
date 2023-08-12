@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Search Subreddit</title>
+    <title>Get Subreddit</title>
     <!-- Bootstrap CSS -->
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
@@ -20,32 +20,65 @@
     </style>
 </head>
 <body>
-    <div class="container">
-        <form method="post" class="bg-white p-4 rounded shadow-sm">
-            {{ form.hidden_tag() }}
-            <div class="form-group">
-                <label for="{{ form.subreddit.id }}">{{ form.subreddit.label }}</label>
-                {{ form.subreddit(class="form-control") }}
+    <!-- Section: Design Block -->
+    <section class="">
+        <!-- Jumbotron -->
+        <div class="px-4 py-5 px-md-5 text-center text-lg-start" style="background-color: hsl(0, 0%, 96%)">
+            <div class="container">
+                <div class="row gx-lg-5 align-items-center">
+                    <div class="col-lg-6 mb-5 mb-lg-0">
+                        <h3 class="my-5 display-3 fw-bold ls-tight">
+                            ReddiTagger
+                        </h3>
+                        <p style="color: hsl(217, 10%, 50.8%)">
+                            Using advanced NER techniques, the application identifies and categorizes mentions of Organizations, specific locations, and broader geographical entities like countries or states. 
+                            Beyond mere entity extraction, the application delves into sentiment analysis, 
+                            quantifying the general sentiment (positive or negative) associated with each detected entity
+                        </p><br><br>
+                        <p style="color: hsl(217, 10%, 50.8%)">
+                            Serve a real-time sentiment barometer for key entities across a selection of Reddit's most vibrant communities
+                        </p>
+                    </div>
+        
+                    <div class="col-lg-6 mb-5 mb-lg-0">
+                        <div class="card">
+                            <div class="card-body py-5 px-md-5">
+                                <form method="post">
+                                    {{ form.hidden_tag() }}
+                
+                                    <!-- Subreddit input -->
+                                    <div class="form-outline mb-4">
+                                        <label for="{{ form.subreddit.id }}" class="form-label">{{ form.subreddit.label }}</label>
+                                        {{ form.subreddit(class="form-control") }}
+                                    </div>
+                    
+                                    <!-- Entity Dropdown using Flask-WTF -->
+                                    <div class="form-outline mb-4">
+                                        {{ form.entity.label(class="form-label") }}
+                                        {{ form.entity(class="form-control") }}
+                                    </div>
+                    
+                                    <!-- Submit button -->
+                                    <div>
+                                        {{ form.submit(class="btn btn-primary btn-block mb-4") }}
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-
-            <!-- Entity Dropdown using Flask-WTF -->
-            <div class="form-group">
-                {{ form.entity.label(class="form-label") }}
-                {{ form.entity(class="form-control") }}
-            </div>
-
-            <div>
-                {{ form.submit(class="btn btn-dark btn-block") }}
-            </div>
-        </form>
-        <!-- Spinner (You can trigger and control it using JavaScript) -->
-        <div class="spinner-border text-primary" role="status" id="loadingSpinner" style="display: none;">
-            <span class="sr-only">Loading...</span>
         </div>
-        <!-- Progress Bar (You can set its value using JavaScript) -->
-        <div class="progress mt-3 w-100" style="display: none;" id="progressBarContainer">
-            <div class="progress-bar" role="progressbar" style="width: 0%;" id="progressBar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
-        </div>
+    <!-- Jumbotron -->
+    </section>
+    <!-- Section: Design Block -->
+    <!-- Spinner (You can trigger and control it using JavaScript) -->
+    <div class="spinner-border text-primary" role="status" id="loadingSpinner" style="display: none;">
+        <span class="sr-only">Loading...</span>
+    </div>
+    <!-- Progress Bar (You can set its value using JavaScript) -->
+    <div class="progress mt-3 w-100" style="display: none;" id="progressBarContainer">
+        <div class="progress-bar" role="progressbar" style="width: 0%;" id="progressBar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
     </div>
 </body>
 
