@@ -23,16 +23,24 @@ dash_app = dash.Dash(__name__, server=app,
 
 dash_app.title = "ReddiTagger"
 
-cache = Cache(app, config={'CACHE_TYPE': 'simple'})
+cache = Cache(app, config={'CACHE_TYPE': 'simple', 'CACHE_DEFAULT_TIMEOUT': 300})
 
 class SearchForm(FlaskForm):
-    subreddit = StringField('Subreddit')
+    subreddit = SelectField('Subreddit', choices=[
+        ('Investing', 'investing'),
+        ('Stocks','stocks')
+        ('Europe', 'europe'),
+        ('Africa','africa'),
+        ('Asia','asia')
+        ('History', 'history'),
+        ('Worldnews','worldnews'),
+        ('Travel','travel'),
+        ('Geography','geography')
+    ])
     entity = SelectField('Entity', choices=[
-        ('ORG', 'ORG'),
-        ('LOC', 'LOC'),
-        ('EVENT', 'EVENT'),
-        ('GPE', 'GPE'),
-        ('WORK_OF_ART', 'WORK_OF_ART')
+        ('Organizations', 'ORG'),
+        ('Location', 'LOC'),
+        ('Countries/State', 'GPE'),
     ])
     submit = SubmitField('Submit')
 
@@ -40,7 +48,7 @@ nlp = spacy.load('en_core_web_trf')
 # classifier = TextClassifier.load('en-sentiment')
 
 entity = "ORG"
-def extract_entity(text,entity=entity):
+def extract_entity(text,entity="ORG"):
     """
     Splits text into overlapping segments of maximum length max_len using a stride.
     """
@@ -94,7 +102,7 @@ def get_sentiments(text):
     
     return sentiment_label, confidence_score
 
-def generate_df(df, entity=entity):
+def generate_df(df, entity="ORG"):
     distributions = {}
     for _,row in df.iterrows():
         direction = row['sentiment'][0]
@@ -109,15 +117,15 @@ def generate_df(df, entity=entity):
         distributions[key]['SCORE'] = distributions[key]['POSITIVE'] - distributions[key]['NEGATIVE']
     data = pd.DataFrame(list(distributions.values()))
     
-    if 'FREQS' in data.columns:
-        return data.sort_values('FREQS', ascending=False).head(12)
-    return pd.DataFrame()
+    if "FREQS" in data.columns:
+        return data.sort_values('FREQS', ascending=False)
+    return pd.DataFrame(columns=['POSITIVE', 'NEGATIVE', entity, 'FREQS', 'SCORE'])
 
-def get_reddit_data(subreddit="Investing", url='', headers=''):
+def get_reddit_data(subreddit="", headers=''):
     post_list = []
 
     try:
-        res = requests.get(f"{url}/r/{subreddit}/new", headers=headers, params={"limit": 100})
+        res = requests.get(f"https://oauth.reddit.com/r/{subreddit}/new", headers=headers, params={"limit": 100})
         res.raise_for_status()
         
         while len(post_list) <= 1000:
@@ -140,7 +148,7 @@ def get_reddit_data(subreddit="Investing", url='', headers=''):
             if not after:
                 break
             
-            res = requests.get(f"{url}/r/{subreddit}/new", headers=headers, params={"limit": 100, "after": after})
+            res = requests.get(f"https://oauth.reddit.com/r/{subreddit}/new", headers=headers, params={"limit": 100, "after": after})
             res.raise_for_status()
 
     except requests.RequestException as e:
@@ -188,25 +196,21 @@ def get_data():
 
     form = SearchForm()
     if form.validate_on_submit():
-        global entity
         subreddit = form.subreddit.data
+        global entity
         entity = form.entity.data
-        print("Entity: ",entity)
         headers = {
             'Authorization': f"bearer {session['access_token']}",
             "User-Agent": "EntityTaggerev0.0.1 by anthony_tobi"
         }
 
-        url = "https://oauth.reddit.com"
-        data = get_reddit_data(subreddit=subreddit,url=url, headers=headers)
-        print(data['selftext'][0])
-        print(len(data))
-        if len(data) <= 1:
-            return redirect('/')
-        data['organization'] = data['selftext'].apply(extract_entity)
+        data = get_reddit_data(subreddit=subreddit, headers=headers)
+        print(data.info())
+        data['organization'] = data['selftext'].apply(extract_entity, entity=entity)
         data['sentiment'] = data['selftext'].apply(get_sentiments)
         df = generate_df(df=data, entity=entity)
-        cache.set('df', df)  # Store the processed df in cache
+        print(df.info())
+        cache.set('df', df, timeout=3000)  # Store the processed df in cache
 
         return redirect('/dashboard')
     return render_template('search_form.html', form=form)
@@ -324,6 +328,13 @@ dash_app.layout = html.Div(style={'backgroundColor': '#e9ecef'}, children=[
                         dcc.Graph(id='pie-chart')
                     ], width=6),
                 ]),
+
+                dbc.Row([
+                    dbc.Col([
+                        # Top 5 rows in a table
+                        dcc.Graph(id='scatter-plot')
+                    ], width=12, className="mb-3")
+                ]),
             ], width=9)  # This will take up the remaining 9 out of 12 portions of the width
         ]),
     ], fluid=True)
@@ -336,23 +347,54 @@ dash_app.layout = html.Div(style={'backgroundColor': '#e9ecef'}, children=[
     [
     Output('data-table', 'children'),
     Output('bar-plot', 'figure'),
-    Output('pie-chart', 'figure')],
-    [Input("entity", "value"),
-    Input('score-slider', 'value')]
+    Output('pie-chart', 'figure'),
+    Output('scatter-plot','figure')],
+    [Input('score-slider', 'value')]
 )
 
 
 
-def update_graphs(value,score_range):
-    df = fetch_df_from_cache()
-    if df.empty:
-        return "No data available.", {}, {}
-        
+def update_graphs(score_range):
+    df = cache.get('df')
     print("Entity: ",entity)
-    dic_map = {'ORG': 'Organization','LOC': "Location", 'GPE': 'Countries/States',
-                'EVENT':'Event','WORK_OF_ART': 'Work of art'}
+    if df is None or df.empty:
+        return "No data available.", {}, {}, {}
+   
+    cache.set('df', df, timeout=1500)
+    dic_map = {'ORG': 'Organization','LOC': "Location", 'GPE': 'Countries/States'}
     filtered_df = df[df['SCORE'].between(score_range[0], score_range[1])].iloc[:10]
     
+    categories = ['POSITIVE', 'NEGATIVE', 'SCORE']
+
+    # Create Radar Chart
+    radar_chart = go.Figure()
+
+    # Iterate through each organization and create a trace for each one
+    for org in filtered_df[entity]:
+        row = filtered_df[filtered_df[entity] == org]
+        radar_chart.add_trace(
+            go.Scatterpolar(
+                r=[row[c].values[0] for c in categories],
+                theta=categories,
+                fill='toself',
+                name=org
+            )
+        )
+
+    # Update Layout
+    radar_chart.update_layout(
+        polar=dict(
+            radialaxis=dict(
+                visible=True,
+                range=[0, 1]  # This sets the range of values for our radar chart, since our values are between 0 and 1
+            )
+        ),
+        showlegend=True,
+        title_text=f"Metrics comparison across {dic_map[entity]}",
+        title_x=0.5
+    )
+
+
     # Creating the bar plot
     bar_plot = go.Figure(data=[go.Bar(
         x=filtered_df[entity],
@@ -372,7 +414,7 @@ def update_graphs(value,score_range):
         title_text=f"Frequency per {dic_map[entity]}",
         title_x=0.5  # Center the title
     )
-    return dbc.Table.from_dataframe(filtered_df.head(), striped=True, bordered=True, hover=True), bar_plot, pie_chart
+    return dbc.Table.from_dataframe(filtered_df.head(), striped=True, bordered=True, hover=True), bar_plot, pie_chart, radar_chart
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
