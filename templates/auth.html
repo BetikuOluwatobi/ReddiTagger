@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authenticate with Reddit</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+</head>
+
+<body class="d-flex justify-content-center align-items-center" style="height: 100vh; background-color: #f4f4f4;">
+    <div class="card p-5">
+        <div class="card-body text-center">
+            <h3>Welcome!</h3>
+            <div>
+                <p class="mt-4">Click the link below to login in to Reddit to use the app:</p>
+                <a href="{{ auth_url }}" class="btn btn-primary mt-2">Authenticate</a>
+            </div>
+
+            <hr class="my-4"> <!-- Horizontal line for visual separation -->
+
+            <div>
+                <p class="mb-0">Don't have a Reddit account? <a href="https://www.reddit.com/register" target="_blank" class="text-dark-50 fw-bold">Sign Up</a></p>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

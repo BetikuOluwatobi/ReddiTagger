@@ -167,7 +167,7 @@ REDIRECT_URI = 'http://localhost:5000/callback'
 @app.route('/')
 def homepage():
     auth_url = f"https://www.reddit.com/api/v1/authorize?client_id={CLIENT_ID}&response_type=code&state=random_string&redirect_uri={REDIRECT_URI}&scope=identity read"
-    return f'<a href="{auth_url}">Authenticate with Reddit</a>'
+    return render_template('auth.html', auth_url=auth_url)
 
 @app.route('/callback')
 def callback():
