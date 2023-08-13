@@ -1,100 +1,97 @@
-# ReddiTagger: Named Entity Recognition and Sentiment Analysis with spaCy and Flair
+# ReddiTagger: Advanced NER and Sentiment Analysis with spaCy & Flair
 
-ReddiTagger is a comprehensive project built to analyze Reddit data, extracting named entities using the `en_core_web_trf` spaCy model, and performing sentiment classification using the Flair library. The tool can be visualized using Dash.
+Dive deep into Reddit's data with ReddiTagger. Harnessing the prowess of spaCy's `en_core_web_trf` and the sentiment analysis capabilities of Flair, this project is designed to efficiently extract named entities and analyze sentiments. Visual insights are made available via a user-friendly Dash interface.
 
 ## Features
 
-- **Entity Extraction**: Uses spaCy's Transformer model (`en_core_web_trf`) for high-accuracy named entity recognition.
-- **Sentiment Classification**: Applies the Flair library to assign sentiment scores.
-- **Data Visualization**: Utilizes Dash to create an interactive dashboard showcasing entity sentiments.
-- **Authentication**: Seamless Reddit OAuth authentication to access data.
+- **Entity Extraction**: Lean on the precision of spaCy's Transformer model, `en_core_web_trf`, for top-tier NER.
+- **Sentiment Determination**: Exploit Flair's sentiment analysis capabilities to ascertain sentiments.
+- **Interactive Data Visualization**: Present the gathered insights through a vibrant Dash dashboard.
+- **Secure Authentication**: Leverage Reddit's OAuth for seamless and secure data access.
 
-## Setting Up & Running
+## Installation & Setup
 
 ### Prerequisites
 
-Make sure you have Python 3.x installed.
+Ensure Python 3.x is installed on your machine.
 
+### Step-by-step Installation
 
-### Installation
+1. **Clone the Repository**:
+   ```bash
+   git clone https://github.com/BetikuOluwatobi/ReddiTagger.git
+   ```
 
-1. Clone the repository:
-```
-git clone https://github.com/BetikuOluwatobi/ReddiTagger.git
-```
+2. **Navigate to the Project Directory**:
+   ```bash
+   cd ReddiTagger
+   ```
 
-2. Create and Activate a Virtual Environment:
- ```bash
- python3 -m venv myenv
- source venv/bin/activate
- ```
+3. **Set up a Virtual Environment and Activate It**:
+   ```bash
+   python3 -m venv myenv
+   source myenv/bin/activate
+   ```
 
-3. Navigate to the project directory:
-```
-cd ReddiTagger
-```
+4. **Install Required Libraries**:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-4. Install the required libraries:
-```
-pip install -r requirements.txt
-```
+5. **Fetch the Essential spaCy Model**:
+   ```bash
+   python -m spacy download en_core_web_trf
+   ```
 
-5. Download the required spaCy model:
-```
-python -m spacy download en_core_web_trf
-```
-
-6. Set your environment variables for `CLIENT_ID`, `CLIENT_SECRET`, and `REDIRECT_URI`. These will be used for Reddit API access.
+6. **Environment Variables**: Update your environment with `CLIENT_ID`, `CLIENT_SECRET`, and `REDIRECT_URI` for Reddit API interactions.
    
-7. Also, set the `redirect_url=http://localhost:5000/callback` in your Reddit app.
+7. **Reddit App Configuration**: Ensure you've set `redirect_url` to `http://localhost:5000/callback` within your Reddit app.
 
-### Running the Application
+### Launching the Application
 
-Execute the script:
-```
-python app.py
-```
+1. Run the following command:
+   ```bash
+   python app.py
+   ```
 
-Then, navigate to `http://localhost:5000/` on your browser to use the ReddiTagger dashboard.
+2. Open a browser and visit `http://localhost:5000/` to experience the ReddiTagger dashboard.
 
-## Usage
+## How to Use
 
-1. **Homepage**: Start by authenticating with Reddit. This uses OAuth2 to securely access the Reddit API.
-2. **Authenticate**: Select a subreddit and entity type (like Organization, Location, or Country/State) you want to analyze.
-3. **Dashboard**: View the interactive charts showing entity sentiments. Adjust the sentiment score slider to filter entities based on their sentiment scores.
+1. **Homepage**: Initiate by authenticating through Reddit using the secure OAuth2 protocol.
+2. **Authenticate**: Pick your desired subreddit and specify the entity type (e.g., Organization, Location, Country/State) for analysis.
+3. **Dashboard**: Explore interactive visualizations, shedding light on entity sentiments. Fine-tune your view by adjusting the sentiment score slider.
 
-### Docker Installation
+### Docker Setup
 
-**Note**: The Docker image is around 7GB, so it might take a while to build.
+> **Heads-up**: The Docker image is sizable (~7GB). Patience is the key during the build.
 
-1. **Build the Docker Image**
+1. **Craft the Docker Image**:
+   ```bash
+   docker build -t redditagger .
+   ```
 
-    ```bash
-    docker build -t redditagger .
-    ```
+2. **Deploy the Docker Container**: Remember to slot in your specific `CLIENT_ID` and `CLIENT_SECRET`.
+   ```bash
+   docker run -d -p 5000:5000 -e CLIENT_ID=<YOUR_CLIENT_ID> -e CLIENT_SECRET=<YOUR_CLIENT_SECRET> redditagger
+   ```
 
-2. **Run the Docker Container**
+> **Tip**: Procure your `CLIENT_ID` and `CLIENT_SECRET` from the Reddit App Preferences at `reddit.com/prefs/apps`. If you're a first-timer, initiate by creating a Reddit App. Your credentials will be listed under the app's details section.
 
-    Make sure to replace `<YOUR_CLIENT_ID>` and `<YOUR_CLIENT_SECRET>` with your Reddit application credentials.
+## Comprehensive Video Walkthrough
 
-    ```bash
-    docker run -d -p 5000:5000 -e CLIENT_ID=<YOUR_CLIENT_ID> -e CLIENT_SECRET=<YOUR_CLIENT_SECRET> redditagger
-    ```
+For an extensive tutorial on ReddiTagger, we've curated a video series to assist you:
+- [ReddiTagger - Introduction & Overview](https://youtu.be/XQZ4CF-KoDc)
+- [ReddiTagger - Deep Dive & Features](https://youtu.be/gRfhRyPEqWI)
 
-**Tip**: You can obtain `CLIENT_ID` and `CLIENT_SECRET` from the Reddit App Preferences: `reddit.com/prefs/apps`. If you haven't created a Reddit App yet, you'll need to do so. The `CLIENT_ID` and `CLIENT_SECRET` are found under the newly created app's details.
+## Contribution
 
-## Embedded Video Tutorial
-For a comprehensive walkthrough of the ReddiTagger application and to understand its functionalities better, check out the embedded video tutorial available on YouTube: [ReddiTagger Part 1](https://youtu.be/XQZ4CF-KoDc)
-[ReddiTagger Part 2](https://youtu.be/gRfhRyPEqWI)
+Your insights can shape ReddiTagger's future! Feel free to fork, tweak, and submit pull requests. We eagerly await your feedback, queries, and contributions.
 
-## Contributing
+## Licensing
 
-Feel free to fork this repository, make your changes, and submit a pull request. Feedback, issues, and contributions are highly appreciated!
-
-## License
-
-This project is open source, under the MIT license.
+ReddiTagger is open-sourced under the MIT license.
 
 ---
 
-Enjoy using ReddiTagger and gain insights from the vast world of Reddit data!
+Dive into the ocean of Reddit data with ReddiTagger and unearth exciting insights! 🚀
