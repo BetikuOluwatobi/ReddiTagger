@@ -86,7 +86,7 @@ For an extensive tutorial on ReddiTagger, we've curated a video series to assist
 
 ## Contribution
 
-Your insights can shape ReddiTagger's future! Feel free to fork, tweak, and submit pull requests. We eagerly await your feedback, queries, and contributions.
+Your insights can shape ReddiTagger's future! Feel free to fork, tweak, and submit pull requests.
 
 ## Licensing
 
