@@ -23,22 +23,28 @@ Make sure you have Python 3.x installed.
 git clone https://github.com/BetikuOluwatobi/ReddiTagger.git
 ```
 
-2. Navigate to the project directory:
+2. Create and Activate a Virtual Environment:
+ ```bash
+ python3 -m venv myenv
+ source venv/bin/activate
+ ```
+
+3. Navigate to the project directory:
 ```
 cd ReddiTagger
 ```
 
-3. Install the required libraries:
+4. Install the required libraries:
 ```
 pip install -r requirements.txt
 ```
 
-4. Download the required spaCy model:
+5. Download the required spaCy model:
 ```
 python -m spacy download en_core_web_trf
 ```
 
-5. Set your environment variables for `CLIENT_ID`, `CLIENT_SECRET`, and `REDIRECT_URI`. These will be used for Reddit API access.
+6. Set your environment variables for `CLIENT_ID`, `CLIENT_SECRET`, and `REDIRECT_URI`. These will be used for Reddit API access.
    
 7. Also, set the `redirect_url=http://localhost:5000/callback` in your Reddit app.
 
